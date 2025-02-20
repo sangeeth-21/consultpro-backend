@@ -1,0 +1,9 @@
+name = "prisma-d1-example"
+main = "src/index.ts"
+compatibility_date = "2024-03-20"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "DB" # i.e. available in your Worker on env.DB
+database_name = "consultpro"
+database_id = "23ba265d-7f9c-4050-b411-b0711f9d3cfd"
