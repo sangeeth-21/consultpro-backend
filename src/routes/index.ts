@@ -1,8 +1,8 @@
 import { Hono } from "hono";
-import { authRoutes } from "./routes/auth";
-import { userRoutes } from "./routes/users";
-import { bookingRoutes } from "./routes/bookings";
-import { paymentRoutes } from "./routes/payment";
+import { authRoutes } from "./auth";
+import { userRoutes } from "./users";
+import { bookingRoutes } from "./bookings";
+import { paymentRoutes } from "./payment";
 
 const app = new Hono();
 
