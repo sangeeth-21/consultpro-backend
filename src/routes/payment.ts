@@ -1,38 +1,68 @@
 import { Hono } from "hono";
-import { PaymentSchema } from "../validations/payment";
+import { PaymentSchema } from "../validations/payment"; // Import the updated schema
 import { initializeDb } from "../db";
 import { bookings } from "../db/schema";
 import { eq } from "drizzle-orm";
 import { verifyToken } from "../utils/jwt";
 
-// Define the Cashfree API response type
-interface CashfreePaymentResponse {
-  order_id: string;
-  payment_session_id: string; // Session ID for payment gateway
-  order_status: string;
-  cf_order_id: string;
-  order_token: string;
-  order_amount: number;
-  order_currency: string;
-  order_note: string;
-  customer_details: {
-    customer_id: string;
-    customer_email: string;
-    customer_phone: string;
-  };
+// Define the Razorpay API response types
+interface RazorpayOrderResponse {
+  id: string;
+  entity: string;
+  amount: number;
+  amount_paid: number;
+  amount_due: number;
+  currency: string;
+  receipt: string;
+  offer_id: string | null;
+  status: string;
+  attempts: number;
+  notes: string[];
+  created_at: number;
 }
 
-export const paymentRoutes = new Hono<{ Bindings: { DB: D1Database; JWT_SECRET: string; CASHFREE_APP_ID: string; CASHFREE_SECRET_KEY: string } }>();
+interface RazorpayPaymentResponse {
+  id: string;
+  entity: string;
+  amount: number;
+  currency: string;
+  status: string;
+  order_id: string;
+  invoice_id: string | null;
+  international: boolean;
+  method: string;
+  amount_refunded: number;
+  refund_status: string | null;
+  captured: boolean;
+  description: string;
+  card_id: string | null;
+  bank: string | null;
+  wallet: string | null;
+  vpa: string | null;
+  email: string;
+  contact: string;
+  notes: string[];
+  fee: number;
+  tax: number;
+  error_code: string | null;
+  error_description: string | null;
+  created_at: number;
+}
+
+export const paymentRoutes = new Hono<{ Bindings: { DB: D1Database; JWT_SECRET: string; RAZORPAY_KEY_ID: string; RAZORPAY_KEY_SECRET: string } }>();
 
 // Generate a shorter order ID
 const generateOrderId = (bookingUid: string) => {
   const uuidWithoutDashes = bookingUid.replace(/-/g, ""); // Remove dashes from UUID
   const timestamp = Date.now().toString().slice(-6); // Use last 6 digits of timestamp
-  return `order_${uuidWithoutDashes}_${timestamp}`; // Combine UUID and timestamp
+  const orderId = `order_${uuidWithoutDashes}_${timestamp}`; // Combine UUID and timestamp
+
+  // Ensure the receipt is no longer than 40 characters
+  return orderId.slice(0, 40);
 };
 
-// Process Payment
-paymentRoutes.post("/process", async (c) => {
+// Create Razorpay Order and Capture Payment
+paymentRoutes.post("/payment-create", async (c) => {
   const token = c.req.header("Authorization")?.split(" ")[1];
   if (!token) return c.json({ error: "Unauthorized" }, 401);
 
@@ -40,7 +70,7 @@ paymentRoutes.post("/process", async (c) => {
   if (!payload) return c.json({ error: "Invalid token" }, 401);
 
   const body = await c.req.json();
-  const { bookingUid, amount } = PaymentSchema.parse(body);
+  const { bookingUid, amount, paymentMethod } = PaymentSchema.parse(body); // Include paymentMethod
 
   const db = initializeDb(c.env.DB);
 
@@ -59,51 +89,77 @@ paymentRoutes.post("/process", async (c) => {
     // Generate a shorter order ID
     const orderId = generateOrderId(bookingUid);
 
-    // Call Cashfree API to create a payment order
-    const cashfreeResponse = await fetch("https://sandbox.cashfree.com/pg/orders", {
+    // Step 1: Create a Razorpay order
+    const razorpayOrderResponse = await fetch("https://api.razorpay.com/v1/orders", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-client-id": c.env.CASHFREE_APP_ID,
-        "x-client-secret": c.env.CASHFREE_SECRET_KEY,
-        "x-api-version": "2022-09-01",
+        Authorization: `Basic ${btoa(`${c.env.RAZORPAY_KEY_ID}:${c.env.RAZORPAY_KEY_SECRET}`)}`,
       },
       body: JSON.stringify({
-        order_id: orderId,
-        order_amount: amount,
-        order_currency: "INR",
-        order_note: "Booking payment",
-        customer_details: {
-          customer_id: payload.uuid,
-          customer_email: booking.email,
-          customer_phone: "9999999999",
+        amount: amount * 100, // Razorpay expects amount in paise
+        currency: "INR",
+        receipt: orderId,
+        notes: {
+          bookingUid: bookingUid,
+          customerEmail: booking.email,
         },
       }),
     });
 
-    if (!cashfreeResponse.ok) {
-      const errorResponse = await cashfreeResponse.json();
-      console.error("Cashfree API Error:", errorResponse);
-      return c.json({ error: "Payment failed", details: errorResponse }, 400);
+    if (!razorpayOrderResponse.ok) {
+      const errorResponse = await razorpayOrderResponse.json();
+      console.error("Razorpay Order API Error:", errorResponse);
+      return c.json({ error: "Order creation failed", details: errorResponse }, 400);
     }
 
+    const razorpayOrder = await razorpayOrderResponse.json() as RazorpayOrderResponse;
+
+    // Step 2: Capture the payment using the order ID
+    const razorpayPaymentResponse = await fetch("https://api.razorpay.com/v1/payments", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Basic ${btoa(`${c.env.RAZORPAY_KEY_ID}:${c.env.RAZORPAY_KEY_SECRET}`)}`,
+      },
+      body: JSON.stringify({
+        amount: amount * 100, // Amount in paise
+        currency: "INR",
+        order_id: razorpayOrder.id,
+        method: paymentMethod, // Use the provided payment method
+        email: booking.email,
+        contact: "9999999999", // Replace with actual contact number
+        notes: {
+          bookingUid: bookingUid,
+        },
+      }),
+    });
+
+    if (!razorpayPaymentResponse.ok) {
+      const errorResponse = await razorpayPaymentResponse.json();
+      console.error("Razorpay Payment API Error:", errorResponse);
+      return c.json({ error: "Payment capture failed", details: errorResponse }, 400);
+    }
+
+    const razorpayPayment = await razorpayPaymentResponse.json() as RazorpayPaymentResponse;
+
     // Log the full response for debugging
-    const paymentData = await cashfreeResponse.json() as CashfreePaymentResponse;
-    console.log("Cashfree API Response:", paymentData);
+    console.log("Razorpay Payment API Response:", razorpayPayment);
 
     // Update booking payment status
     await db
       .update(bookings)
       .set({
-        paymentStatus: "pending", // Set to pending until payment is confirmed
+        paymentStatus: razorpayPayment.status, // Set to the payment status returned by Razorpay
         updatedAt: new Date().toISOString(),
       })
       .where(eq(bookings.uid, bookingUid));
 
-    // Return the payment session ID
+    // Return the payment ID
     return c.json({
-      message: "Payment session created successfully",
-      paymentSessionId: paymentData.payment_session_id, // Use payment_session_id for redirection
+      message: "Payment created and captured successfully",
+      paymentId: razorpayPayment.id,
+      paymentStatus: razorpayPayment.status,
     });
   } catch (err) {
     console.error("Payment processing error:", err);

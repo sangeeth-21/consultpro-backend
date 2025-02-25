@@ -2,6 +2,8 @@ name = "consultpro"
 main = "./src/index.ts"
 compatibility_date = "2024-02-21"
 
+compatibility_flags = ["nodejs_compat"]
+
 # [vars]
 # MY_VAR = "my-variable"
 
@@ -14,8 +16,9 @@ migrations_dir = "drizzle"
 
 [vars]
 JWT_SECRET = "27f5d5c4ed6c078a22a09e31d0d9699f3e23e9fa61072f07433a61d69e11d7fce8e69a3f29e2882e7b1bcec681cf47d81334812788cbd979a420e15e8448c9b119357271971a5351964aa548dbd4ab5f73a015fc802d744e88dad3bed15b88f0e7fa46cf68307053f4bbd766397672c0e9fa23a5ad9ef698acd03424d76df1f0859681a02990aed0cf53b230f0337768b69cc926998aad9556782c3c8a2f5a3a1df6884e7e84a567c62d5ba9248492a3e0236dd0acec220b1805ef7c01a71a2efd1b6e03b17722a2a9765dce17e2166ab50d0a02ec6b461d32a592fc4c0bc9682fb05e18862dd95256bde32d5dc85c52fa9948e9de71d8de20b9d6bfa62fa8d4"
-CASHFREE_APP_ID = "968908b6a9ad5692a1844a53c09869"
-CASHFREE_SECRET_KEY = "ca7ed75c7d9dfc0d4f158fb9cdaa567e1ef169ff"
+RAZORPAY_KEY_ID = "rzp_test_QbAH8Ogv74xqKh"
+RAZORPAY_KEY_SECRET = "1Zn81kH5XIIIoIfiOfyvdDWw"
+ZOHO_ACCOUNT_DOMAIN = "https://meeting.zoho.in"
 
 # [ai]
 # binding = "AI"

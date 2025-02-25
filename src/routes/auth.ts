@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 import { SignupSchema, LoginSchema } from "../validations/user";
 import { generateToken } from "../utils/jwt";
 import { initializeDb } from "../db";
@@ -7,6 +8,10 @@ import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 
 export const authRoutes = new Hono<{ Bindings: { DB: D1Database; JWT_SECRET: string } }>();
+
+// Add CORS middleware
+authRoutes.use("/signup", cors());
+authRoutes.use("/login", cors());
 
 authRoutes.post("/signup", async (c) => {
   const body = await c.req.json();
