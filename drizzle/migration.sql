@@ -1,11 +1,25 @@
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     sno INTEGER PRIMARY KEY AUTOINCREMENT,
     uuid TEXT NOT NULL UNIQUE,
-    name TEXT,
+    name TEXT NOT NULL,
     email TEXT UNIQUE NOT NULL,
     phoneno TEXT,
     password TEXT NOT NULL,
     status INTEGER DEFAULT 1 NOT NULL,
     role TEXT DEFAULT 'user' NOT NULL,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS bookings (
+    sno INTEGER PRIMARY KEY AUTOINCREMENT,
+    uid TEXT NOT NULL UNIQUE,
+    userid TEXT NOT NULL,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL,
+    calendar_date TEXT NOT NULL,
+    fileurl TEXT,
+    status TEXT DEFAULT 'pending' NOT NULL,
+    payment_status TEXT DEFAULT 'unpaid' NOT NULL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
